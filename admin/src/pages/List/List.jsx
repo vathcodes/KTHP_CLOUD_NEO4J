@@ -4,7 +4,8 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
-const List = ({ url }) => {
+const List = () => {
+  const url = "http://localhost:4000";
   const [list, setList] = useState([]);
   const [filteredList, setFilteredList] = useState([]);
   const [search, setSearch] = useState("");
@@ -96,7 +97,7 @@ const List = ({ url }) => {
   const submitEdit = async () => {
     try {
       const formData = new FormData();
-      formData.append("id", editingFood._id);
+      formData.append("id", editingFood.id);
       formData.append("name", editData.name);
       formData.append("category", editData.category);
       formData.append("price", editData.price);
@@ -172,7 +173,7 @@ const List = ({ url }) => {
             <span>${item.price}</span>
             <span className="action-icons">
               <FaEdit className="icon edit" onClick={() => openEditModal(item)} />
-              <FaTrash className="icon remove" onClick={() => removeFood(item._id)} />
+              <FaTrash className="icon remove" onClick={() => removeFood(item.id)} />
             </span>
           </div>
         ))}

@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 
 const Add = () => {
-  const url = "http://34.9.54.54:4000";
+  const url = "http://localhost:4000";
 
   const [image, setImage] = useState(null); // file ảnh
   const [data, setData] = useState({

@@ -14,7 +14,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 const App = () => {
 
-const url = "http://34.9.54.54:4000"
+const url = "http://localhost:4000"
 
   return (
     <div>

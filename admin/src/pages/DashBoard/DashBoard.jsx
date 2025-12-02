@@ -15,7 +15,9 @@ const Dashboard = ({ url }) => {
   const [foods, setFoods] = useState([]);
   const [orders, setOrders] = useState([]);
   const [orderChartData, setOrderChartData] = useState([]);
-  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d", "#f08080"];
+
+  const PIE_COLORS = ["#FF6384", "#36A2EB", "#FFCE56", "#8BC34A", "#FF9800", "#9C27B0", "#00BCD4"];
+  const BAR_COLORS = ["#FF6384", "#36A2EB", "#FFCE56", "#8BC34A", "#FF9800", "#9C27B0", "#00BCD4", "#E91E63", "#3F51B5", "#009688", "#795548"];
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -40,6 +42,7 @@ const Dashboard = ({ url }) => {
           orders: ordersData.length
         });
 
+        // Orders chart
         const dateMap = {};
         ordersData.forEach(order => {
           const date = new Date(order.createdAt).toLocaleDateString();
@@ -82,29 +85,50 @@ const Dashboard = ({ url }) => {
     saveAs(new Blob([wbout], { type: "application/octet-stream" }), "foods.xlsx");
   };
 
-const exportOrdersToExcel = () => {
-  const ws = XLSX.utils.json_to_sheet(
-    orders.map(o => ({
-      OrderID: o._id,
-      UserName: o.address ? `${o.address.firstName} ${o.address.lastName}` : "Unknown",
-      UserEmail: o.address?.email || "Unknown",
-      Phone: o.address?.phone || "N/A",
-      Address: o.address
-        ? `${o.address.street}, ${o.address.city}, ${o.address.state}, ${o.address.zipCode}, ${o.address.country}`
-        : "N/A",
-      OrderedFoods: o.items?.map(i => i.name).join(", ") || "N/A",
-      Amount: o.amount,
-      Status: o.status || "Pending",
-      CreatedAt: o.createdAt ? new Date(o.createdAt).toLocaleString() : ""
-    }))
-  );
+  const exportOrdersToExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(
+      orders.map(o => ({
+        OrderID: o.id,
+        UserName: o.address ? `${o.address.firstName} ${o.address.lastName}` : "Unknown",
+        UserEmail: o.address?.email || "Unknown",
+        Phone: o.address?.phone || "N/A",
+        Address: o.address
+          ? `${o.address.street}, ${o.address.city}, ${o.address.state}, ${o.address.zipCode}, ${o.address.country}`
+          : "N/A",
+        OrderedFoods: o.items?.map(i => i.name).join(", ") || "N/A",
+        Amount: o.amount,
+        Status: o.status || "Pending",
+        CreatedAt: o.createdAt ? new Date(o.createdAt).toLocaleString() : ""
+      }))
+    );
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Orders");
-  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  saveAs(new Blob([wbout], { type: "application/octet-stream" }), "orders.xlsx");
-};
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Orders");
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([wbout], { type: "application/octet-stream" }), "orders.xlsx");
+  };
 
+  // ================= Chart Data Optimizations =================
+  // PieChart: Số lượng món theo category
+  const categoryMap = {};
+  foods.forEach(f => {
+    const cat = f.category || "Unknown";
+    categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+  });
+  const categoryData = Object.keys(categoryMap).map(key => ({
+    category: key,
+    count: categoryMap[key]
+  }));
+
+  // BarChart: Top 10 Foods + Others
+  const topFoods = [...foods]
+    .sort((a, b) => (b.price || 0) - (a.price || 0))
+    .slice(0, 10);
+  const othersValue = foods.slice(10).reduce((sum, f) => sum + (f.price || 0), 0);
+  const barData = [
+    ...topFoods.map(f => ({ name: f.name, price: f.price || 0 })),
+    ...(othersValue > 0 ? [{ name: "Others", price: othersValue }] : [])
+  ];
 
   return (
     <div className="dashboard-container">
@@ -138,6 +162,7 @@ const exportOrdersToExcel = () => {
 
       {/* Charts Row */}
       <div className="charts-row">
+        {/* Orders Over Time */}
         <div className="chart-item">
           <h3>Orders Over Time</h3>
           <ResponsiveContainer width="100%" height={300}>
@@ -151,40 +176,31 @@ const exportOrdersToExcel = () => {
           </ResponsiveContainer>
         </div>
 
+        {/* PieChart: số lượng món theo category */}
         <div className="chart-item">
-          <h3>Food Distribution</h3>
+          <h3>Food Distribution by Category</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={foods.map(f => ({ name: f.name || "Unknown", value: f.price || 0 }))}
-                dataKey="value"
-                nameKey="name"
+                data={categoryData}
+                dataKey="count"
+                nameKey="category"
                 cx="50%"
                 cy="50%"
                 outerRadius={100}
-                label
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
               >
-                {foods.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                {categoryData.map((_, index) => (
+                  <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                 ))}
               </Pie>
               <Legend />
+              <Tooltip />
             </PieChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="chart-item">
-          <h3>Foods Price Chart</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={foods.map(f => ({ name: f.name, price: f.price || 0 }))}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="price" fill="#82ca9d" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+       
       </div>
     </div>
   );

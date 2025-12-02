@@ -4,10 +4,10 @@ import { StoreContext } from '../../context/StoreContext';
 import FoodItem from '../FoodItem/FoodItem';
 
 const FoodDisplay = ({ category = "All", searchTerm = "" }) => {
-  const { food_list } = useContext(StoreContext) || { food_list: [] };
+  const { foodList } = useContext(StoreContext) || { foodList: [] };
 
-  // đảm bảo food_list luôn là mảng
-  const list = Array.isArray(food_list) ? food_list : [];
+  // đảm bảo foodList luôn là mảng
+  const list = Array.isArray(foodList) ? foodList : [];
 
   const filteredList = list.filter(item => {
     const matchCategory = category === "All" || category === item.category;
@@ -20,10 +20,10 @@ const FoodDisplay = ({ category = "All", searchTerm = "" }) => {
       <h2>Danh sách món ăn</h2>
       <div className="food-display-list">
         {filteredList.length > 0 ? (
-          filteredList.map((item, index) => (
+          filteredList.map((item) => (
             <FoodItem
-              key={index}
-              id={item._id}
+              key={item.id}
+              id={item.id}
               name={item.name}
               description={item.description}
               price={item.price}

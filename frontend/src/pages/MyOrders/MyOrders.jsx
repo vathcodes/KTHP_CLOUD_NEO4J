@@ -54,7 +54,7 @@ const MyOrders = () => {
                             }
                         </p>
 
-                        <p>{order.amount}$</p>
+                        <p>{order.amount} đ</p>
                         <p>Số món: {order.items.length}</p>
 
                         {/* Chuyển trạng thái sang tiếng Việt */}

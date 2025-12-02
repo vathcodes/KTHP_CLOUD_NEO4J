@@ -10,7 +10,7 @@ const User = () => {
   const [loading, setLoading] = useState(true);
 
   const api = axios.create({
-    baseURL: "http://34.9.54.54:4000",
+    baseURL: "http://localhost:4000",
   });
 
   // Fetch all users
@@ -45,7 +45,7 @@ const User = () => {
     e.preventDefault();
     try {
       if (editingUser) {
-        await api.put(`/api/users/${editingUser._id}`, form);
+        await api.put(`/api/users/${editingUser.id}`, form);
         setEditingUser(null);
       } else {
         await api.post("/api/users/register", form);
@@ -122,7 +122,7 @@ const User = () => {
           </div>
 
           {users.map((user) => (
-            <div key={user._id} className="user-list-table-format row">
+            <div key={user.id} className="user-list-table-format row">
               <span>{user.name}</span>
               <span>{user.email}</span>
               <span className="user-action-icons">
@@ -132,7 +132,7 @@ const User = () => {
                 />
                 <FaTrash
                   className="icon remove"
-                  onClick={() => handleDelete(user._id)}
+                  onClick={() => handleDelete(user.id)}
                 />
               </span>
             </div>

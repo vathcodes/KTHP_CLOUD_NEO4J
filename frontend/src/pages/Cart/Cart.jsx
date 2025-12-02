@@ -4,13 +4,27 @@ import { StoreContext } from '../../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 
 const Cart = () => {
-  const { cartItems, food_list, addToCart, removeFromCart, getTotalCartAmount, url } = useContext(StoreContext);
+  const { cartItems, foodList, addToCart, removeFromCart, getTotalCartAmount, url } = useContext(StoreContext);
   const navigate = useNavigate();
 
   const SHIPPING_FEE = 2000; // phí ship cố định VND
 
-  // Format VND trực tiếp
+  // Format VND
   const formatVND = (value) => Number(value).toLocaleString('vi-VN') + ' ₫';
+
+  // Lấy danh sách item thực tế hiển thị trong cart
+  const cartDisplayItems = Object.keys(cartItems)
+    .map(itemId => {
+      const item = foodList.find(food => food.id.toString() === itemId.toString());
+      if (item && cartItems[itemId] > 0) {
+        return { ...item, quantity: cartItems[itemId] };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  if (foodList.length === 0) return <p>Đang tải món ăn...</p>;
+  if (cartDisplayItems.length === 0) return <p>Giỏ hàng trống.</p>;
 
   return (
     <div className='cart'>
@@ -23,31 +37,26 @@ const Cart = () => {
           <p>Tổng cộng</p>
           <p>Xóa</p>
         </div>
-        <br />
         <hr />
-        {Object.keys(cartItems).map((itemId) => {
-          const item = food_list.find(food => food._id === itemId);
-          if (item && cartItems[itemId] > 0) {
-            return (
-              <div key={item._id}>
-                <div className='cart-items-title cart-items-item'>
-                  <img src={url + "/images/" + item.image} alt="" />
-                  <p>{item.name}</p>
-                  <p>{formatVND(item.price)}</p>
-                  <div className='cart-quantity'>
-                    <button onClick={() => removeFromCart(itemId)}>-</button>
-                    <span>{cartItems[itemId]}</span>
-                    <button onClick={() => addToCart(itemId)}>+</button>
-                  </div>
-                  <p>{formatVND(item.price * cartItems[itemId])}</p>
-                  <p onClick={() => removeFromCart(itemId)} className='cross'>x</p>
-                </div>
-                <hr />
-              </div>
-            );
-          }
-          return null;
-        })}
+
+        {cartDisplayItems.map(item => (
+          <div key={item.id} className='cart-items-title cart-items-item'>
+        <div className="cart-img-wrapper">
+  <img src={url + "/images/" + item.image} alt={item.name} />
+</div>
+
+            <div className="cart-item-name">{item.name}</div>
+            <p>{formatVND(item.price)}</p>
+            <div className='cart-quantity'>
+              <button onClick={() => removeFromCart(item.id)}>-</button>
+              <span>{item.quantity}</span>
+              <button onClick={() => addToCart(item.id)}>+</button>
+            </div>
+            <p>{formatVND(item.price * item.quantity)}</p>
+            <p onClick={() => removeFromCart(item.id)} className='cross'>x</p>
+            <hr />
+          </div>
+        ))}
       </div>
 
       <div className="cart-bottom">

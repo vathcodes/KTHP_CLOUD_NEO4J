@@ -157,13 +157,10 @@
 
 
 
-
-
-import orderModel from "../models/orderModel.js";
-import userModel from "../models/userModel.js";
-import foodModel from "../models/foodModel.js";
+import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import moment from "moment";
+import { getSession } from "../config/db.js"; // Đảm bảo bạn export getSession từ file db
 
 // ==============================
 // CẤU HÌNH VNPAY (SANDBOX)
@@ -171,38 +168,30 @@ import moment from "moment";
 const VNPAY_TMN_CODE = "DH2F13SW";
 const VNPAY_HASH_SECRET = "7VJPG70RGPOWFO47VSBT29WPDYND0EJG";
 const VNPAY_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-const VNPAY_RETURN_URL = `${process.env.FRONTEND_URL}/payment-success`;
 
-// ==============================
-// HÀM SORT + TẠO CHỮ KÝ CHUẨN VNPAY (QUAN TRỌNG NHẤT)
-// ==============================
+// Helper functions VNPay
 function sortObject(obj) {
   const sorted = {};
-  const keys = Object.keys(obj).sort();
-
-  for (const key of keys) {
-    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
-      sorted[key] = obj[key];
-    }
-  }
+  Object.keys(obj)
+    .sort()
+    .forEach((key) => {
+      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+        sorted[key] = obj[key];
+      }
+    });
   return sorted;
 }
 
-// Tạo chữ ký đúng chuẩn VNPay (không dùng qs.stringify)
 function sha512Sign(data, secretKey) {
-  let signString = "";
   const sortedData = sortObject(data);
-
+  let signString = "";
   for (const key in sortedData) {
-    const value = sortedData[key];
     if (signString) signString += "&";
-    signString += `${key}=${encodeURIComponent(value).replace(/%20/g, "+")}`;
+    signString += `${key}=${encodeURIComponent(sortedData[key]).replace(/%20/g, "+")}`;
   }
-
   return crypto.createHmac("sha512", secretKey).update(signString, "utf-8").digest("hex");
 }
 
-// Tạo query string đúng chuẩn (không dùng qs)
 function buildQueryString(params) {
   const parts = [];
   for (const key in params) {
@@ -213,10 +202,11 @@ function buildQueryString(params) {
   return parts.join("&");
 }
 
-// ======================================================
-// 1. TẠO ĐƠN HÀNG + LINK THANH TOÁN VNPAY (ĐÃ BẢO MẬT GIÁ TIỀN)
-// ======================================================
+// ==============================
+// 1. TẠO ĐƠN HÀNG + LINK VNPAY
+// ==============================
 const placeOrder = async (req, res) => {
+  const session = getSession();
   try {
     const shippingFee = 2000;
     const userId = req.user?.id;
@@ -226,62 +216,89 @@ const placeOrder = async (req, res) => {
     }
 
     const { items, address } = req.body;
-
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, message: "Giỏ hàng trống!" });
     }
 
-    // ===== BƯỚC QUAN TRỌNG: TỰ TÍNH LẠI TỔNG TIỀN TỪ DB =====
+    // Tính lại tổng tiền từ DB (bảo mật)
     let calculatedTotal = 0;
     const validItems = [];
 
     for (const item of items) {
-      const food = await foodModel.findById(item._id);
-      if (!food) {
+      if (!item.id || !item.quantity){
+        console.warn("Bỏ item không hợp lệ:", item);
+        continue;
+    }
+      const foodResult = await session.run(
+        `MATCH (f:Food {id: $foodId}) RETURN f.price AS price, f.name AS name, f.image AS image`,
+        { foodId: item.id }
+      );
+
+      if (foodResult.records.length === 0) {
         return res.status(400).json({
           success: false,
-          message: `Món ăn không tồn tại: ${item.name || item._id}`,
+          message: `Món ăn không tồn tại: ${item.name || item.id}`,
         });
       }
 
-      // Dùng đúng giá trong DB (không tin frontend)
-      const itemTotal = food.price * item.quantity;
+      const food = foodResult.records[0];
+      let price = food.get("price");
+      price = (price && typeof price.toNumber === "function") ? price.toNumber() : Number(price) || 0;
+      const name = food.get("name");
+      const image = food.get("image");
+
+      const itemTotal = price * item.quantity;
       calculatedTotal += itemTotal;
 
       validItems.push({
-        foodId: food._id,
-        name: food.name,
-        price: food.price,        // giá chính xác từ DB
+        foodId: item.id,
+        name,
+        price,
         quantity: item.quantity,
-        image: food.image,
+        image,
       });
     }
 
     const totalAmount = calculatedTotal + shippingFee;
-
-    // Tạo đơn hàng
-    const newOrder = new orderModel({
-      userId,
-      items: validItems,        // lưu đúng giá + tên từ DB
-      amount: totalAmount,      // tổng tiền đã được tính lại
-      address,
-      payment: false,
-    });
-    await newOrder.save();
-
-    // Xóa giỏ hàng
-    await userModel.findByIdAndUpdate(userId, { cartData: {} });
-
-    // Mã đơn đẹp + mã giao dịch VNPay
-    const displayOrderCode = `DH${newOrder._id.toString().slice(-8).toUpperCase()}`;
+    const orderId = uuidv4();
+    const displayOrderCode = `DH${orderId.slice(-8).toUpperCase()}`;
     const vnpTxnRef = Date.now().toString();
 
-    await orderModel.findByIdAndUpdate(newOrder._id, {
-      orderCode: displayOrderCode,
-      vnpTxnRef,
-    });
+    // Tạo đơn hàng trong Neo4j
+    await session.run(
+      `
+      MATCH (u:User {id: $userId})
+      CREATE (o:Order {
+        id: $orderId,
+        orderCode: $orderCode,
+        vnpTxnRef: $vnpTxnRef,
+        amount: $amount,
+        address: $address,
+        payment: false,
+        status: "Pending",
+        createdAt: datetime(),
+        items: $items
+      })
+      CREATE (u)-[:PLACED]->(o)
+      `,
+      {
+        userId,
+        orderId,
+        orderCode: displayOrderCode,
+        vnpTxnRef,
+        amount: totalAmount,
+        address: JSON.stringify(address),
+        items: JSON.stringify(validItems),
+      }
+    );
 
-    // IP + params VNPay
+    // Xóa giỏ hàng người dùng
+    await session.run(
+      `MATCH (u:User {id: $userId}) SET u.cartData = null`,
+      { userId }
+    );
+
+    // Tạo URL thanh toán VNPay
     const ipAddr =
       req.headers["x-forwarded-for"]?.split(",").shift() ||
       req.connection?.remoteAddress ||
@@ -298,7 +315,7 @@ const placeOrder = async (req, res) => {
       vnp_OrderInfo: `Thanh toan don hang ${displayOrderCode}`,
       vnp_OrderType: "billpayment",
       vnp_Locale: "vn",
-      vnp_ReturnUrl: `${process.env.BACKEND_URL}/api/order/vnpay_return?orderId=${newOrder._id}`,
+      vnp_ReturnUrl: `${process.env.BACKEND_URL}/api/order/vnpay_return?orderId=${orderId}`,
       vnp_IpAddr: ipAddr,
       vnp_CreateDate: moment().format("YYYYMMDDHHmmss"),
     };
@@ -311,7 +328,7 @@ const placeOrder = async (req, res) => {
     return res.json({
       success: true,
       message: "Tạo đơn hàng thành công",
-      orderId: newOrder._id,
+      orderId,
       orderCode: displayOrderCode,
       amount: totalAmount,
       payUrl: paymentUrl,
@@ -322,197 +339,226 @@ const placeOrder = async (req, res) => {
       success: false,
       message: "Lỗi server khi tạo đơn hàng",
     });
+  } finally {
+    await session.close();
   }
 };
-// ======================================================
-// 2. VNPAY RETURN + IPN (HOÀN CHỈNH – ĐÃ FIX 100%)
-// ======================================================
+
+// ==============================
+// 2. VNPAY RETURN + IPN
+// ==============================
 const vnpayIPN = async (req, res) => {
+  const session = getSession();
   try {
     const vnpParams = { ...req.query };
     const secureHash = vnpParams.vnp_SecureHash;
 
-    // 1. Loại bỏ hash + chỉ giữ lại các param vnp_
     delete vnpParams.vnp_SecureHash;
     delete vnpParams.vnp_SecureHashType;
 
     const vnpData = {};
     for (const key in vnpParams) {
-      if (key.startsWith("vnp_") && vnpParams[key] !== "") {
+      if (key.startsWith("vnp_") && vnpParams[key]) {
         vnpData[key] = vnpParams[key];
       }
     }
 
-    // 2. Tạo chuỗi ký (sort + encode chuẩn VNPay)
-    const sortedKeys = Object.keys(vnpData).sort();
-    let signData = sortedKeys
+    const signData = Object.keys(vnpData)
+      .sort()
       .map((key) => `${key}=${encodeURIComponent(vnpData[key]).replace(/%20/g, "+")}`)
       .join("&");
 
-    // 3. Tính lại hash
     const calculatedHash = crypto
       .createHmac("sha512", VNPAY_HASH_SECRET)
       .update(signData, "utf-8")
       .digest("hex");
 
-    // 4. DEBUG LOG (có thể tắt sau khi ổn định)
-    console.log("=== VNPAY CALLBACK ===");
-    console.log("vnp_TxnRef      :", vnpParams.vnp_TxnRef);
-    console.log("ResponseCode    :", vnpParams.vnp_ResponseCode);
-    console.log("Hash Match      :", calculatedHash === secureHash);
-    console.log("Calculated Hash :", calculatedHash);
-    console.log("Received Hash   :", secureHash);
-    console.log("SignData        :", signData);
-    console.log("==========================");
-
-    // 5. Kiểm tra chữ ký
     if (calculatedHash !== secureHash) {
       console.error("VNPAY: Chữ ký không hợp lệ!");
       return res.json({ RspCode: "97", Message: "Invalid signature" });
     }
 
-    const txnRef = vnpParams.vnp_TxnRef?.toString();
+    const txnRef = vnpParams.vnp_TxnRef;
     const responseCode = vnpParams.vnp_ResponseCode;
 
-    if (!txnRef) {
-      return res.json({ RspCode: "02", Message: "Missing vnp_TxnRef" });
+    const result = await session.run(
+      `MATCH (o:Order {vnpTxnRef: $txnRef}) RETURN o`,
+      { txnRef }
+    );
+
+    const orderRecord = result.records[0];
+    if (!orderRecord) {
+      return res.json({ RspCode: "01", Message: "Order not found" });
     }
 
-    // 6. Tìm đơn hàng
-    const order = await orderModel.findOne({ vnpTxnRef: txnRef });
+    const order = orderRecord.get("o").properties;
 
-    if (!order) {
-      console.log(`VNPAY: Không tìm thấy đơn với vnpTxnRef = ${txnRef}`);
-      const recent = await orderModel
-        .find({ vnpTxnRef: { $exists: true } })
-        .sort({ date: -1 })
-        .limit(5)
-        .select("orderCode vnpTxnRef date");
-      console.log("5 đơn gần nhất có vnpTxnRef:", recent.map(o => ({
-        code: o.orderCode,
-        txn: o.vnpTxnRef,
-        date: o.date
-      })));
-
-      return res.json({ RspCode: "01", Message: "Ordenot found" });
-    }
-
-    // 7. Xử lý kết quả thanh toán
     if (responseCode === "00") {
-      // THANH TOÁN THÀNH CÔNG
       if (!order.payment) {
-        order.payment = true;
-        order.paymentMethod = "VNPAY";
-        order.paymentDate = new Date();
-        order.status = "Processing"; // hoặc "Confirmed", "Paid"...
-        await order.save();
-
-        console.log(`VNPAY: Đơn hàng ${order.orderCode} đã thanh toán thành công!`);
-      } else {
-        console.log(`VNPAY: Đơn ${order.orderCode} đã được xác nhận trước đó`);
+        await session.run(
+          `
+          MATCH (o:Order {vnpTxnRef: $txnRef})
+          SET o.payment = true,
+              o.paymentMethod = "VNPAY",
+              o.paymentDate = datetime(),
+              o.status = "Processing"
+          `,
+          { txnRef }
+        );
+        console.log(`VNPAY: Đơn ${order.orderCode} thanh toán thành công!`);
       }
 
-      // Return URL (người dùng thấy) → redirect về frontend
       if (req.query.orderId) {
-        const redirectUrl = `${process.env.FRONTEND_URL}/payment-success?orderId=${req.query.orderId}&status=success`;
-        return res.redirect(redirectUrl);
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/payment-success?orderId=${req.query.orderId}&status=success`
+        );
       }
 
-      // IPN → trả JSON cho VNPay
       return res.json({ RspCode: "00", Message: "Confirm Success" });
     } else {
-      // THANH TOÁN THẤT BẠI
-      console.log(`VNPAY: Thanh toán thất bại - Order: ${order.orderCode}, Code: ${responseCode}`);
-
       if (req.query.orderId) {
-        const redirectUrl = `${process.env.FRONTEND_URL}/payment-success?orderId=${req.query.orderId}&status=failed`;
-        return res.redirect(redirectUrl);
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/payment-success?orderId=${req.query.orderId}&status=failed`
+        );
       }
-
       return res.json({ RspCode: responseCode || "24", Message: "Payment failed" });
     }
   } catch (error) {
-    console.error("Lỗi nghiêm trọng trong vnpayIPN:", error);
-    return res.status(500).json({ RspCode: "99", Message: "System error" });
+    console.error("Lỗi vnpayIPN:", error);
+    return res.json({ RspCode: "99", Message: "System error" });
+  } finally {
+    await session.close();
   }
 };
-// Export
-export { placeOrder, vnpayIPN };
-// ======================================================
-// 3. LẤY ĐƠN HÀNG NGƯỜI DÙNG
-// ======================================================
+
+// ==============================
+// 3. LẤY ĐƠN HÀNG CỦA USER
+// ==============================
 const userOrders = async (req, res) => {
+  const session = getSession();
   try {
     const userId = req.user.id;
 
-    const orders = await orderModel.find({ userId }).sort({ createdAt: -1 });
+    const result = await session.run(
+      `
+      MATCH (u:User {id: $userId})-[:PLACED]->(o:Order)
+      RETURN o ORDER BY o.createdAt DESC
+      `,
+      { userId }
+    );
 
+const orders = result.records.map((record) => {
+  const props = record.get("o").properties;
+  return {
+    ...props,
+    address: props.address ? JSON.parse(props.address) : null,
+    items: props.items ? JSON.parse(props.items) : [],
+  };
+});
     res.json({ success: true, data: orders });
   } catch (err) {
-    console.log("Lỗi userOrders:", err);
+    console.error("Lỗi userOrders:", err);
     res.json({ success: false, data: [], message: "Lỗi lấy đơn hàng" });
+  } finally {
+    await session.close();
   }
 };
 
-// ======================================================
-// 4. ADMIN – LIST ALL ORDERS
-// ======================================================
+// ==============================
+// 4. ADMIN - DANH SÁCH TẤT CẢ ĐƠN
+// ==============================
 const listOrders = async (req, res) => {
+  const session = getSession();
   try {
-    const orders = await orderModel.find({})
-      .populate("userId", "name email")
-      .sort({ createdAt: -1 });
+    const result = await session.run(
+      `
+      MATCH (u:User)-[:PLACED]->(o:Order)
+      RETURN o, u.name AS userName, u.email AS userEmail
+      ORDER BY o.createdAt DESC
+      `
+    );
+
+    const orders = result.records.map((record) => {
+      const props = record.get("o").properties;
+
+      // THÊM DÒNG NÀY ĐỂ PARSE address và items!!!
+      let address = null;
+      let items = [];
+
+      try {
+        address = props.address ? JSON.parse(props.address) : null;
+        items = props.items ? JSON.parse(props.items) : [];
+      } catch (e) {
+        console.error("Lỗi parse JSON đơn hàng:", props.id, e);
+      }
+
+      return {
+        ...props,
+        address,   // ← Đã parse thành object
+        items,     // ← Đã parse thành array
+        userName: record.get("userName"),
+        userEmail: record.get("userEmail"),
+      };
+    });
 
     res.json({ success: true, data: orders });
   } catch (err) {
-    console.log(err);
+    console.error("Lỗi listOrders:", err);
     res.json({ success: false, message: "Error" });
+  } finally {
+    await session.close();
   }
 };
-
-// ======================================================
-// 5. ADMIN – UPDATE STATUS
-// ======================================================
+// ==============================
+// 5. ADMIN - CẬP NHẬT TRẠNG THÁI
+// ==============================
 const updateStatus = async (req, res) => {
+  const session = getSession();
   try {
-    await orderModel.findByIdAndUpdate(req.body.orderId, {
-      status: req.body.status,
-    });
+    const { orderId, status } = req.body;
+
+    await session.run(
+      `MATCH (o:Order {id: $orderId}) SET o.status = $status`,
+      { orderId, status }
+    );
 
     res.json({ success: true, message: "Cập nhật trạng thái thành công" });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.json({ success: false, message: "Error updating order status" });
+  } finally {
+    await session.close();
   }
 };
 
-// ======================================================
-// 6. ADMIN – DELETE ORDER
-// ======================================================
+// ==============================
+// 6. ADMIN - XÓA ĐƠN HÀNG
+// ==============================
 const removeOrder = async (req, res) => {
+  const session = getSession();
   try {
     const { orderId } = req.body;
-
     if (!orderId) {
       return res.json({ success: false, message: "orderId is required" });
     }
 
-    const deletedOrder = await orderModel.findByIdAndDelete(orderId);
+    const result = await session.run(
+      `MATCH (o:Order {id: $orderId}) DETACH DELETE o RETURN count(o) AS deleted`,
+      { orderId }
+    );
 
-    if (!deletedOrder) {
+    const deleted = result.records[0]?.get("deleted")?.toNumber() || 0;
+    if (deleted === 0) {
       return res.json({ success: false, message: "Order not found" });
     }
 
     res.json({ success: true, message: "Xóa đơn hàng thành công" });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.json({ success: false, message: "Error removing order" });
+  } finally {
+    await session.close();
   }
 };
 
-export {
-  userOrders,
-  listOrders,
-  updateStatus,
-  removeOrder
-};
+export { placeOrder, vnpayIPN, userOrders, listOrders, updateStatus, removeOrder };

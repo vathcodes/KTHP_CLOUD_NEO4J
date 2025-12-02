@@ -155,29 +155,39 @@ const Orders = ({ url }) => {
             <img src={assets.parcel_icon} alt="" />
             <div>
               <p className='order-item-food'>
-                {order.items.map((item, idx) => (
-                  idx === order.items.length - 1
-                    ? `${item.name} x ${item.quantity}`
-                    : `${item.name} x ${item.quantity}, `
-                ))}
-              </p>
+              {(Array.isArray(order.items) ? order.items : []).map((item, idx) => (
+                idx === order.items.length - 1
+                  ? `${item.name} x ${item.quantity}`
+                  : `${item.name} x ${item.quantity}, `
+              ))}
+            </p>
+
 
               <p className='order-item-name'>
-                {order.address.firstName + " " + order.address.lastName}
-              </p>
+  {order.address?.firstName && order.address?.lastName 
+    ? `${order.address.firstName} ${order.address.lastName}`
+    : "Khách lẻ"}
+</p>
 
-              <div className="order-item-address">
-                <p>{order.address.street + ","}</p>
-                <p>{order.address.city + ", " + order.address.state + ", " + order.address.country + ", " + order.address.zipCode}</p>
-              </div>
+<div className="order-item-address">
+  <p>{order.address?.street || "Chưa có địa chỉ"},</p>
+  <p>
+    {[
+      order.address?.city,
+      order.address?.state,
+      order.address?.country,
+      order.address?.zipCode
+    ].filter(Boolean).join(", ") || "Chưa có địa chỉ chi tiết"}
+  </p>
+</div>
 
-              <p className='order-item-phone'>{order.address.phone}</p>
+<p className='order-item-phone'>{order.address?.phone || "Không có SĐT"}</p>
             </div>
 
             <p>Số món: {order.items.length}</p>
             <p>{formatVND(order.amount)}</p> {/* amount luôn VND */}
 
-            <select onChange={(event) => statusHandler(event, order._id)} value={order.status}>
+            <select onChange={(event) => statusHandler(event, order.id)} value={order.status}>
               <option value="Food Processing">Đang Chế Biến</option>
               <option value="Out for delivery">Đang Giao Hàng</option>
               <option value="Delivered">Đã Giao</option>

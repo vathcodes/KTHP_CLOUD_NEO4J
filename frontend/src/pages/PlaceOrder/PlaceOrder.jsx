@@ -5,7 +5,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 const PlaceOrder = () => {
-  const { getTotalCartAmount, token, food_list, cartItems, url } =
+  const { getTotalCartAmount, token, foodList, cartItems, url } =
     useContext(StoreContext);
   const navigate = useNavigate();
 
@@ -36,18 +36,21 @@ const PlaceOrder = () => {
       return;
     }
 
-    // Chỉ gửi _id + quantity → backend tự lấy giá từ DB → chống hack giá
-    let orderItems = food_list
-      .filter((item) => cartItems[item._id] > 0)
-      .map((item) => ({
-        _id: item._id,
-        quantity: cartItems[item._id],
-      }));
+    let orderItems = foodList
+  .filter(item => cartItems[item.id.toString()] > 0)
+  .map(item => ({
+    id: item.id,
+    quantity: cartItems[item.id.toString()],
+  }));
+  console.log("orderItems", orderItems);
+
 
     const orderData = {
       address: data,
       items: orderItems,
     };
+    console.log("orderData", orderData);
+
 
     try {
       const response = await axios.post(`${url}/api/order/place`, orderData, {
