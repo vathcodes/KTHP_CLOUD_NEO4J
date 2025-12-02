@@ -1,0 +1,90 @@
+.sidebar {
+  width: 220px;
+  min-height: 100vh;
+  background-color: #fff;
+  border-right: 1px solid #ddd;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding-top: 40px;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+}
+
+.sidebar-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 0 15px;
+}
+
+.sidebar-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #555;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sidebar-option img {
+  width: 24px;
+  height: 24px;
+}
+
+.sidebar-option span {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.sidebar-option:hover {
+  background-color: #ffece0;
+  color: #ff5722;
+}
+
+.sidebar-option.active {
+  background-color: #ffebd9;
+  border-left: 4px solid #ff5722;
+  color: #ff5722;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: 60px;
+    padding-top: 20px;
+  }
+
+  .sidebar-option {
+    justify-content: center;
+    padding: 10px 0;
+  }
+
+  .sidebar-option span {
+    display: none;
+  }
+
+  .sidebar-option img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .sidebar-option.active {
+    border-left: none;
+    border-radius: 50%;
+    background-color: #ffebd9;
+  }
+}
+/* CSS gốc giữ nguyên */
+
+.sidebar-option img {
+  width: 24px;
+  height: 24px;
+}
+
+/* Responsive cũng giữ nguyên, icon tăng chút size là ok */
+.sidebar-option img {
+  width: 28px;
+  height: 28px;
+}

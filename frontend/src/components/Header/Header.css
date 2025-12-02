@@ -1,0 +1,74 @@
+.header {
+    height: 34vw; /* Sửa lỗi: vW → vw */
+    margin: 30px auto;
+    background: url('/header_img.png') no-repeat;
+    background-size: cover;   
+    background-position: center;
+    position: relative;
+    border-radius: 20px;   
+    overflow: hidden;  
+}
+
+.header-contents {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: 1.5vw;
+    max-width: 50%;
+    bottom: 10%;
+    left: 6vw;
+    animation: fadeIn 3s;
+}
+
+.header-contents h2 {
+    font-weight: 600;
+    color: white;
+    font-size: max(4.5vw, 26px);
+    font-family: "Poppins", sans-serif;
+}
+
+.header-contents p {
+    color: white;
+    font-size: max(1.1vw, 14px); 
+    line-height: 1.6;
+    font-family: "Poppins", sans-serif;
+    max-width: 90%;
+}
+
+.header-contents button {
+    border: none;
+    color: #747474;
+    font-weight: 600;
+    padding: 1vw 2.3vw;
+    background-color: white;
+    font-size: max(1vw, 14px);
+    border-radius: 50px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.header-contents button:hover {
+    transform: scale(1.05);
+    opacity: 0.95;
+}
+
+/* Tablet */
+@media (max-width:1050px){
+    .header-contents {
+        max-width: 55%;
+    }
+}
+
+/* Mobile */
+@media (max-width:750px){
+    .header-contents {
+        max-width: 70%;
+    }
+    .header-contents p {
+        display: none;
+    }
+    .header-contents button {
+        padding: 2vw 4vw;
+    }
+}

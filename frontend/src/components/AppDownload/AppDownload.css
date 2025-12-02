@@ -1,0 +1,25 @@
+.app-download p {
+    font-size: 50px;       /* Tăng kích thước chữ */
+    font-weight: 600;      /* Làm đậm chữ */
+    text-align: center;    /* Căn giữa chữ */
+    color: #333;           /* Màu chữ */
+    margin-bottom: 12px;
+    margin-top: 30px;   /* Khoảng cách dưới */
+    font-family: "Poppins", sans-serif;  /* Font đẹp */
+}
+
+.app-download-platforms{
+    display: flex;
+    justify-content: center;
+    gap: max(2vw,10px);
+    margin-top: 40px;
+}
+.app-download-platforms img{
+    width: max(30vw,120px);
+    max-width: 180px;
+    transition: 0.5s;
+    cursor: pointer;
+}
+.app-download-platforms img:hover{
+    transform: scale(1.05);
+}

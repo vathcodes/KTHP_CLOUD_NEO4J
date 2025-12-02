@@ -1,0 +1,19 @@
+.menu-page {
+  padding: 20px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* Search box */
+.menu-search {
+  text-align: left; /* sát trái */
+  margin: 20px 0;
+}
+
+.menu-search input {
+  width: 100%;
+  max-width: 400px;
+  padding: 10px 15px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
