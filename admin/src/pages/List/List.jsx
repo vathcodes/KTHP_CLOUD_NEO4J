@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
 const List = () => {
-  const url = "http://localhost:4000";
+  const url = "https://server-cloud-nnqr.onrender.com";
   const [list, setList] = useState([]);
   const [filteredList, setFilteredList] = useState([]);
   const [search, setSearch] = useState("");

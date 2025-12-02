@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 
 const Add = () => {
-  const url = "http://localhost:4000";
+  const url = "https://server-cloud-nnqr.onrender.com";
 
   const [image, setImage] = useState(null); // file ảnh
   const [data, setData] = useState({

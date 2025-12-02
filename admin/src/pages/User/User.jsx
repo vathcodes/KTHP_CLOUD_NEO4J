@@ -10,7 +10,7 @@ const User = () => {
   const [loading, setLoading] = useState(true);
 
   const api = axios.create({
-    baseURL: "http://localhost:4000",
+    baseURL: "https://server-cloud-nnqr.onrender.com",
   });
 
   // Fetch all users
