@@ -315,7 +315,7 @@ const placeOrder = async (req, res) => {
       vnp_OrderInfo: `Thanh toan don hang ${displayOrderCode}`,
       vnp_OrderType: "billpayment",
       vnp_Locale: "vn",
-      vnp_ReturnUrl: `${process.env.BACKEND_URL}/api/order/vnpay_return?orderId=${orderId}`,
+      vnp_ReturnUrl: `https://server-cloud-nnqr.onrender.com/api/order/vnpay_return?orderId=${orderId}`,
       vnp_IpAddr: ipAddr,
       vnp_CreateDate: moment().format("YYYYMMDDHHmmss"),
     };
@@ -410,7 +410,7 @@ const vnpayIPN = async (req, res) => {
 
       if (req.query.orderId) {
         return res.redirect(
-          `${process.env.FRONTEND_URL}/payment-success?orderId=${req.query.orderId}&status=success`
+          `https://client-cloud.onrender.com/payment-success?orderId=${req.query.orderId}&status=success`
         );
       }
 
@@ -418,7 +418,7 @@ const vnpayIPN = async (req, res) => {
     } else {
       if (req.query.orderId) {
         return res.redirect(
-          `${process.env.FRONTEND_URL}/payment-success?orderId=${req.query.orderId}&status=failed`
+          `https://client-cloud.onrender.com/payment-success?orderId=${req.query.orderId}&status=failed`
         );
       }
       return res.json({ RspCode: responseCode || "24", Message: "Payment failed" });
