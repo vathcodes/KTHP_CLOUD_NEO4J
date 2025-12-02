@@ -410,7 +410,7 @@ const vnpayIPN = async (req, res) => {
 
       if (req.query.orderId) {
         return res.redirect(
-          `https://kthp-cloud-neo-4-j.vercel.app/payment-success?orderId=${req.query.orderId}&status=success`
+          `${process.env.FRONTEND_URL}/payment-success?orderId=${req.query.orderId}&status=success`
         );
       }
 
@@ -418,7 +418,7 @@ const vnpayIPN = async (req, res) => {
     } else {
       if (req.query.orderId) {
         return res.redirect(
-          `https://kthp-cloud-neo-4-j.vercel.app/payment-success?orderId=${req.query.orderId}&status=failed`
+          `${process.env.FRONTEND_URL}/payment-success?orderId=${req.query.orderId}&status=failed`
         );
       }
       return res.json({ RspCode: responseCode || "24", Message: "Payment failed" });
