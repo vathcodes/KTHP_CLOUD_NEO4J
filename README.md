@@ -50,7 +50,7 @@ Clean modular architecture with controllers/routes
 
 🔥 Tech Stack
 Layer	Technology
-Backend	Node.js, Express, Neo4j, Cypher, JWT, VNPay
+Backend	Node.js, Express, Neo4j, Multer, JWT, VNPay
 Frontend	React + Vite, Axios, State Management (Redux/Context)
 Admin	React + Vite + UI library (Tailwind/Ant Design/Material UI)
 Database	Neo4j Aura / Neo4j Local
